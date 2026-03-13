@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      width: 300px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #ffffff;
+      color: #1f2937;
+    }
+
+    .popup-header {
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      color: white;
+      padding: 16px 20px;
+    }
+
+    .popup-header h1 {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .popup-header p {
+      font-size: 11px;
+      opacity: 0.85;
+      margin-top: 2px;
+    }
+
+    .popup-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      background: #f9fafb;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .status-active { background: #10b981; }
+    .status-inactive { background: #ef4444; }
+
+    .popup-actions {
+      padding: 12px 16px;
+    }
+
+    .popup-btn {
+      width: 100%;
+      padding: 10px 14px;
+      margin-bottom: 6px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: white;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s;
+    }
+
+    .popup-btn:hover {
+      background: #f3f4f6;
+      border-color: #d1d5db;
+    }
+
+    .popup-btn:last-child { margin-bottom: 0; }
+
+    .popup-shortcuts {
+      padding: 12px 20px;
+      border-top: 1px solid #e5e7eb;
+      font-size: 11px;
+      color: #9ca3af;
+    }
+
+    .shortcut-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+    }
+
+    kbd {
+      background: #f3f4f6;
+      padding: 1px 5px;
+      border-radius: 3px;
+      border: 1px solid #e5e7eb;
+      font-size: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="popup-header">
+    <h1>&#9889; SPH Gmail</h1>
+    <p>Superhuman AI for Gmail</p>
+  </div>
+
+  <div class="popup-status" id="status">
+    <div class="status-dot status-inactive" id="status-dot"></div>
+    <span id="status-text">Not configured</span>
+  </div>
+
+  <div class="popup-actions">
+    <button class="popup-btn" id="btn-triage">&#128202; Triage Inbox</button>
+    <button class="popup-btn" id="btn-summarize">&#10024; Summarize Thread</button>
+    <button class="popup-btn" id="btn-replies">&#9889; Smart Replies</button>
+    <button class="popup-btn" id="btn-settings">&#9881; Settings</button>
+  </div>
+
+  <div class="popup-shortcuts">
+    <div class="shortcut-row"><span>Triage inbox</span> <kbd>Alt+T</kbd></div>
+    <div class="shortcut-row"><span>Summarize thread</span> <kbd>Alt+S</kbd></div>
+    <div class="shortcut-row"><span>Smart replies</span> <kbd>Alt+R</kbd></div>
+    <div class="shortcut-row"><span>Toggle sidebar</span> <kbd>Alt+P</kbd></div>
+    <div class="shortcut-row"><span>Autocomplete</span> <kbd>Tab</kbd></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
