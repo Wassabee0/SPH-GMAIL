@@ -2,46 +2,87 @@
  * SPH Gmail - Main content script entry point.
  * Orchestrates all AI features on the Gmail page.
  */
-(async function SPHGmail() {
+(function SPHGmail() {
   'use strict';
+
+  // Immediate proof-of-life — this runs before anything async
+  console.log('[SPH Gmail] Content script loaded on:', window.location.href);
 
   const LOG_PREFIX = '[SPH Gmail]';
   let provider = null;
   let settings = {};
-  let isInitialized = false;
 
   // ── Initialization ──────────────────────────────────────────────
 
   async function init() {
     console.log(`${LOG_PREFIX} Initializing...`);
 
+    // Show a small toast so the user KNOWS the extension is alive
+    showToast('SPH Gmail loaded — initializing...');
+
     try {
       const data = await browser.storage.local.get('sph_settings');
       settings = data.sph_settings || {};
-
-      if (!settings.provider) {
-        console.log(`${LOG_PREFIX} No provider configured. Showing setup prompt.`);
-        showSetupBanner();
-        return;
-      }
-
-      provider = ProviderFactory.create(settings);
-      console.log(`${LOG_PREFIX} Using provider: ${settings.provider} (${settings.model || 'default model'})`);
+      console.log(`${LOG_PREFIX} Settings loaded:`, settings.provider || 'none');
     } catch (e) {
-      console.error(`${LOG_PREFIX} Failed to initialize provider:`, e);
+      console.error(`${LOG_PREFIX} Could not read storage:`, e);
+      settings = {};
+    }
+
+    if (!settings.provider) {
+      console.log(`${LOG_PREFIX} No provider configured. Showing setup prompt.`);
+      showSetupBanner();
+      showToast('Configure your AI provider to get started');
+      return;
+    }
+
+    try {
+      provider = ProviderFactory.create(settings);
+      console.log(`${LOG_PREFIX} Provider ready: ${settings.provider} (${settings.model || 'default'})`);
+      showToast(`Connected to ${settings.provider}`);
+    } catch (e) {
+      console.error(`${LOG_PREFIX} Failed to create provider:`, e);
       showSetupBanner();
       return;
     }
 
-    await GmailDOM.waitForLoad();
-    console.log(`${LOG_PREFIX} Gmail loaded, attaching features.`);
+    try {
+      await GmailDOM.waitForLoad();
+      console.log(`${LOG_PREFIX} Gmail DOM ready, attaching features.`);
+    } catch (e) {
+      console.error(`${LOG_PREFIX} Gmail DOM wait failed:`, e);
+    }
 
     injectSidebar();
     attachFeatures();
     observeChanges();
-    isInitialized = true;
 
-    console.log(`${LOG_PREFIX} Ready.`);
+    console.log(`${LOG_PREFIX} Fully initialized.`);
+  }
+
+  // ── Toast notification (visual proof extension is running) ──────
+
+  function showToast(message, duration) {
+    duration = duration || 3000;
+    const existing = document.getElementById('sph-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'sph-toast';
+    toast.textContent = '\u26A1 ' + message;
+    toast.style.cssText = [
+      'position:fixed', 'bottom:20px', 'left:50%', 'transform:translateX(-50%)',
+      'background:#4f46e5', 'color:white', 'padding:10px 20px', 'border-radius:8px',
+      'font-family:system-ui,sans-serif', 'font-size:13px', 'font-weight:500',
+      'z-index:999999', 'box-shadow:0 4px 16px rgba(0,0,0,0.2)',
+      'transition:opacity 0.3s', 'opacity:1'
+    ].join(';');
+
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 300);
+    }, duration);
   }
 
   // ── Feature Attachment ──────────────────────────────────────────
@@ -63,9 +104,13 @@
 
   async function runTriage() {
     const rows = GmailDOM.getInboxRows();
-    if (rows.length === 0) return;
+    if (rows.length === 0) {
+      console.log(`${LOG_PREFIX} No inbox rows found to triage.`);
+      return;
+    }
 
     console.log(`${LOG_PREFIX} Triaging ${rows.length} emails...`);
+    showToast(`Triaging ${rows.length} emails...`);
 
     try {
       const results = await Triage.triageBatch(provider, rows);
@@ -73,8 +118,10 @@
         Triage.addBadge(email.rowEl, level, reason);
       });
       console.log(`${LOG_PREFIX} Triage complete.`);
+      showToast('Triage complete');
     } catch (e) {
       console.error(`${LOG_PREFIX} Triage error:`, e);
+      showToast('Triage failed: ' + e.message, 5000);
     }
   }
 
@@ -90,7 +137,6 @@
       const container = document.querySelector('.ade, .nH .if') || document.querySelector('h2.hP')?.parentElement;
       if (!container) return;
 
-      // Show loading state
       let loadingEl = container.querySelector('.sph-summary-loading');
       if (!loadingEl) {
         loadingEl = document.createElement('div');
@@ -117,6 +163,7 @@
       console.error(`${LOG_PREFIX} Summarize error:`, e);
       const loadingEl = document.querySelector('.sph-summary-loading');
       if (loadingEl) loadingEl.remove();
+      showToast('Summary failed: ' + e.message, 5000);
     }
   }
 
@@ -138,8 +185,6 @@
 
       SmartReply.renderChips(threadContainer, suggestions, async (suggestion) => {
         GmailDOM.openReply();
-
-        // Wait for reply box to appear
         await new Promise(r => setTimeout(r, 500));
 
         let replyText = suggestion.body;
@@ -151,6 +196,7 @@
       });
     } catch (e) {
       console.error(`${LOG_PREFIX} Smart reply error:`, e);
+      showToast('Smart replies failed: ' + e.message, 5000);
     }
   }
 
@@ -159,7 +205,6 @@
   function observeChanges() {
     const featureFlags = settings.features || { compose: true, triage: true, summarize: true, smartReply: true };
 
-    // Watch for compose windows
     if (featureFlags.compose) {
       GmailDOM.observeCompose(composeEl => {
         console.log(`${LOG_PREFIX} Compose window detected, injecting toolbar.`);
@@ -167,7 +212,6 @@
       });
     }
 
-    // Watch for navigation (inbox ↔ thread)
     GmailDOM.observeNavigation((hash) => {
       console.log(`${LOG_PREFIX} Navigation: ${hash}`);
       setTimeout(() => attachFeatures(), 500);
@@ -204,8 +248,8 @@
       </div>
       <div class="sph-sidebar-content">
         <div class="sph-sidebar-status">
-          <div class="sph-status-dot sph-status-active"></div>
-          <span>Connected: ${settings.provider} (${settings.model || 'default'})</span>
+          <div class="sph-status-dot ${provider ? 'sph-status-active' : ''}"></div>
+          <span>${provider ? 'Connected: ' + settings.provider + ' (' + (settings.model || 'default') + ')' : 'Not configured'}</span>
         </div>
         <div class="sph-sidebar-actions">
           <button class="sph-btn sph-btn-primary sph-sidebar-btn" data-action="triage">
@@ -262,6 +306,17 @@
     document.body.prepend(banner);
   }
 
+  // ── Listen for messages from popup ──────────────────────────────
+
+  browser.runtime.onMessage.addListener((message) => {
+    console.log(`${LOG_PREFIX} Received message:`, message.action);
+    switch (message.action) {
+      case 'runTriage': runTriage(); break;
+      case 'runSummarize': runSummarize(); break;
+      case 'runSmartReply': runSmartReply(); break;
+    }
+  });
+
   // ── Listen for settings changes ─────────────────────────────────
 
   browser.storage.onChanged.addListener((changes, area) => {
@@ -269,7 +324,12 @@
       console.log(`${LOG_PREFIX} Settings changed, reinitializing...`);
       settings = changes.sph_settings.newValue || {};
       if (settings.provider) {
-        provider = ProviderFactory.create(settings);
+        try {
+          provider = ProviderFactory.create(settings);
+          showToast('Settings updated — now using ' + settings.provider);
+        } catch (e) {
+          console.error(`${LOG_PREFIX} Provider create error:`, e);
+        }
       }
     }
   });
@@ -277,9 +337,7 @@
   // ── Keyboard Shortcuts ──────────────────────────────────────────
 
   document.addEventListener('keydown', (e) => {
-    // Only activate when not typing in an input
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
-      // Tab for autocomplete in compose
       if (e.key === 'Tab' && e.target.isContentEditable && provider) {
         const composeEl = e.target.closest('.M9, .dw .nH');
         if (composeEl && composeEl.dataset.sphCompose) {
@@ -299,32 +357,18 @@
 
     if (!provider) return;
 
-    // Alt+T = Triage
-    if (e.altKey && e.key === 't') {
-      e.preventDefault();
-      runTriage();
-    }
-
-    // Alt+S = Summarize
-    if (e.altKey && e.key === 's') {
-      e.preventDefault();
-      runSummarize();
-    }
-
-    // Alt+R = Smart Replies
-    if (e.altKey && e.key === 'r') {
-      e.preventDefault();
-      runSmartReply();
-    }
-
-    // Alt+P = Toggle sidebar
-    if (e.altKey && e.key === 'p') {
-      e.preventDefault();
-      toggleSidebar();
-    }
+    if (e.altKey && e.key === 't') { e.preventDefault(); runTriage(); }
+    if (e.altKey && e.key === 's') { e.preventDefault(); runSummarize(); }
+    if (e.altKey && e.key === 'r') { e.preventDefault(); runSmartReply(); }
+    if (e.altKey && e.key === 'p') { e.preventDefault(); toggleSidebar(); }
   });
 
   // ── Start ───────────────────────────────────────────────────────
 
-  init();
+  // Wait for body to exist, then init
+  if (document.body) {
+    init();
+  } else {
+    document.addEventListener('DOMContentLoaded', init);
+  }
 })();
