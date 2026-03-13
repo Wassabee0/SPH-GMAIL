@@ -1,12 +1,17 @@
 {
   "manifest_version": 2,
   "name": "SPH Gmail - Superhuman AI for Gmail",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Superhuman-style AI capabilities for Gmail: triage, compose, summaries, and smart replies. Works in Zen Browser and Firefox.",
   "permissions": [
     "storage",
     "activeTab",
-    "tabs"
+    "tabs",
+    "*://api.openai.com/*",
+    "*://api.anthropic.com/*",
+    "*://generativelanguage.googleapis.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
   ],
   "content_scripts": [
     {
@@ -26,7 +31,8 @@
         "src/content/main.js"
       ],
       "css": ["src/ui/styles.css"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": false
     }
   ],
   "background": {
@@ -49,6 +55,7 @@
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
   },
+  "content_security_policy": "script-src 'self'; object-src 'self';",
   "browser_specific_settings": {
     "gecko": {
       "id": "sph-gmail@superhuman-ai",
